@@ -1,0 +1,20 @@
+# Ignorar carpetas de compilación de CMake
+build/
+build-msvc/
+out/
+bin/
+
+# Ignorar archivos generados por Visual Studio
+.vs/
+*.user
+*.suo
+*.db
+*.ipch
+
+# Ignorar ejecutables y binarios compilados
+*.exe
+*.dll
+*.pdb
+*.ilk
+*.lib
+*.exp
