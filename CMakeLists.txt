@@ -13,12 +13,17 @@ find_package(SFML CONFIG REQUIRED COMPONENTS Graphics Window System)
 find_package(imgui CONFIG REQUIRED)
 find_package(ImGui-SFML CONFIG REQUIRED)
 
-add_executable(LogisticaVRP main.cpp Greedy.cpp)
+add_executable(LogisticaVRP
+    main.cpp
+    Greedy.cpp
+    FuerzaBruta.cpp
+    Genetico.cpp
+)
 
-target_link_libraries(LogisticaVRP PRIVATE 
-    SFML::Graphics 
-    SFML::Window 
-    SFML::System 
-    imgui::imgui 
+target_link_libraries(LogisticaVRP PRIVATE
+    SFML::Graphics
+    SFML::Window
+    SFML::System
+    imgui::imgui
     ImGui-SFML::ImGui-SFML
 )

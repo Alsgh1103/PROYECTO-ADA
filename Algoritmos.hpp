@@ -2,4 +2,6 @@
 #include <vector>
 #include "Estructuras.hpp"
 
-std::vector<int> ejecutarGreedy(const std::vector<Nodo>& clientes, const ConfiguracionVRP& config);
+ResultadoAlgoritmo ejecutarGreedy(const std::vector<Nodo>& nodos, const std::vector<Vehiculo>& vehiculos);
+ResultadoAlgoritmo ejecutarFuerzaBruta(const std::vector<Nodo>& nodos, const std::vector<Vehiculo>& vehiculos);
+ResultadoAlgoritmo ejecutarGenetico(const std::vector<Nodo>& nodos, const std::vector<Vehiculo>& vehiculos);
