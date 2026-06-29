@@ -241,6 +241,25 @@ int main() {
     sf::RenderWindow window(sf::VideoMode(sf::Vector2u(1280u, 720u)), "VRP - Logistica GRUPO 2");
     window.setFramerateLimit(60);
 
+    // Configurar el atlas de fuentes ANTES de Init usando shared_font_atlas.
+    // imgui-SFML llama ImGui::CreateContext() internamente; si ya existe un
+    // contexto con el atlas configurado, lo usará correctamente.
+    static ImFontAtlas sharedAtlas;
+    {
+        ImFontConfig cfg;
+        cfg.OversampleH = 2;
+        cfg.OversampleV = 2;
+        // Basic Latin + Latin-1 Supplement + Latin Extended-A y B
+        // Cubre: A-Z a-z 0-9 á é í ó ú ü ñ Ñ y todos los diacríticos
+        static const ImWchar ranges[] = { 0x0020, 0x024F, 0 };
+        ImFont* customFont = sharedAtlas.AddFontFromFileTTF(
+            "C:/Windows/Fonts/arial.ttf", 14.0f, &cfg, ranges);
+        if (!customFont)
+            sharedAtlas.AddFontDefault(); // fallback garantizado si Arial no carga
+    }
+    // Crear el contexto con el atlas compartido antes que imgui-SFML lo haga
+    ImGui::CreateContext(&sharedAtlas);
+
     if (!ImGui::SFML::Init(window)) return 1;
 
     auto& sty = ImGui::GetStyle();
