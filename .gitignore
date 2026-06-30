@@ -18,3 +18,4 @@ bin/
 *.ilk
 *.lib
 *.exp
+CMakeLists.txt

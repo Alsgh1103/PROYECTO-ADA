@@ -1,45 +1,48 @@
 #include "Algoritmos.hpp"
-#include <cmath>
 #include <chrono>
 #include <limits>
 
-static float distM(const Nodo& a, const Nodo& b) {
-    return std::abs(a.pos_x - b.pos_x) + std::abs(a.pos_y - b.pos_y);
-}
-
-ResultadoAlgoritmo ejecutarGreedy(const std::vector<Nodo>& nodos, const std::vector<Vehiculo>& vehiculos) {
+// Greedy nearest-neighbor VRP.
+// Usa demandaTotal() para calcular la carga real de cada nodo (suma de productos).
+ResultadoAlgoritmo ejecutarGreedy(
+    const MatrizDist& dist,
+    const std::vector<Nodo>& nodos,
+    const std::vector<Vehiculo>& vehiculos)
+{
     auto t0 = std::chrono::high_resolution_clock::now();
 
     ResultadoAlgoritmo res;
     res.distanciaTotal = 0.0;
 
     int depIdx = 0;
-    for (int i = 0; i < (int)nodos.size(); ++i)
+    for (int i = 0; i < static_cast<int>(nodos.size()); ++i)
         if (nodos[i].esDeposito) { depIdx = i; break; }
 
     std::vector<bool> visitado(nodos.size(), false);
     visitado[depIdx] = true;
 
-    for (const auto& v : vehiculos) {
+    for (size_t vi = 0; vi < vehiculos.size(); ++vi) {
+        const auto& v = vehiculos[vi];
         std::vector<int> ruta;
         ruta.push_back(depIdx);
-        float carga = v.capacidad;
-        int actual  = depIdx;
-        bool encontro = true;
+        float carga   = v.capacidad;
+        int   actual  = depIdx;
+        bool  encontro = true;
 
         while (encontro) {
             encontro = false;
             int   mejorIdx  = -1;
             float mejorDist = std::numeric_limits<float>::max();
-            for (int i = 0; i < (int)nodos.size(); ++i) {
-                if (!visitado[i] && nodos[i].demanda <= carga) {
-                    float d = distM(nodos[actual], nodos[i]);
+            for (int i = 0; i < static_cast<int>(nodos.size()); ++i) {
+                if (!visitado[i] && demandaTotal(nodos[i].productos) <= carga) {
+                    if (nodos[i].vehiculoAsignado != -1 && nodos[i].vehiculoAsignado != (int)vi) continue;
+                    float d = dist[actual][i];
                     if (d < mejorDist) { mejorDist = d; mejorIdx = i; }
                 }
             }
             if (mejorIdx >= 0) {
                 visitado[mejorIdx] = true;
-                carga -= nodos[mejorIdx].demanda;
+                carga -= demandaTotal(nodos[mejorIdx].productos);
                 res.distanciaTotal += mejorDist;
                 ruta.push_back(mejorIdx);
                 actual = mejorIdx;
@@ -47,9 +50,16 @@ ResultadoAlgoritmo ejecutarGreedy(const std::vector<Nodo>& nodos, const std::vec
             }
         }
 
-        res.distanciaTotal += distM(nodos[actual], nodos[depIdx]);
+        res.distanciaTotal += dist[actual][depIdx];
         ruta.push_back(depIdx);
         res.rutas.push_back(ruta);
+    }
+
+    for (int i = 0; i < static_cast<int>(nodos.size()); ++i) {
+        if (!visitado[i]) {
+            res.distanciaTotal += 1e9;
+            break;
+        }
     }
 
     auto t1 = std::chrono::high_resolution_clock::now();

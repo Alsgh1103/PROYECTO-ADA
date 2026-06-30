@@ -1,75 +1,85 @@
 #include "Algoritmos.hpp"
-#include <cmath>
-#include <chrono>
 #include <algorithm>
-#include <random>
+#include <chrono>
 #include <limits>
-
-static float distGen(const Nodo& a, const Nodo& b) {
-    return std::abs(a.pos_x - b.pos_x) + std::abs(a.pos_y - b.pos_y);
-}
+#include <random>
 
 using Crom = std::vector<int>;
 
-static double evaluar(const Crom& c, const std::vector<Nodo>& nodos,
-                      const std::vector<Vehiculo>& vehiculos, int depIdx,
-                      std::vector<std::vector<int>>& rutasSalida) {
+// Evaluación de fitness. Usa demandaTotal() para validar capacidad.
+static double evaluar(const Crom& c,
+                      const MatrizDist& dist,
+                      const std::vector<Nodo>& nodos,
+                      const std::vector<Vehiculo>& vehiculos,
+                      int depIdx,
+                      std::vector<std::vector<int>>& rutasSalida)
+{
     rutasSalida.clear();
-    double dist = 0.0;
+    double d  = 0.0;
     size_t ci = 0;
 
     for (size_t vi = 0; vi < vehiculos.size() && ci < c.size(); ++vi) {
         std::vector<int> ruta;
         ruta.push_back(depIdx);
-        float carga = vehiculos[vi].capacidad;
-        int actual = depIdx;
+        float carga  = vehiculos[vi].capacidad;
+        int   actual = depIdx;
 
-        while (ci < c.size() && nodos[c[ci]].demanda <= carga) {
-            dist += distGen(nodos[actual], nodos[c[ci]]);
-            carga -= nodos[c[ci]].demanda;
+        while (ci < c.size() &&
+               demandaTotal(nodos[c[ci]].productos) <= carga) {
+            if (nodos[c[ci]].vehiculoAsignado != -1 && nodos[c[ci]].vehiculoAsignado != (int)vi) {
+                break;
+            }
+            d     += dist[actual][c[ci]];
+            carga -= demandaTotal(nodos[c[ci]].productos);
             actual = c[ci];
             ruta.push_back(c[ci]);
             ++ci;
         }
 
-        dist += distGen(nodos[actual], nodos[depIdx]);
+        d += dist[actual][depIdx];
         ruta.push_back(depIdx);
         rutasSalida.push_back(ruta);
     }
 
-    if (ci < c.size()) dist += 1e9;
-    return dist;
+    if (ci < c.size()) d += 1e9;
+    return d;
 }
 
-ResultadoAlgoritmo ejecutarGenetico(const std::vector<Nodo>& nodos, const std::vector<Vehiculo>& vehiculos) {
+// Algoritmo genético VRP.
+// Lógica de selección, cruce y mutación idéntica al original.
+ResultadoAlgoritmo ejecutarGenetico(
+    const MatrizDist& dist,
+    const std::vector<Nodo>& nodos,
+    const std::vector<Vehiculo>& vehiculos)
+{
     auto t0 = std::chrono::high_resolution_clock::now();
 
     ResultadoAlgoritmo mejor;
     mejor.distanciaTotal = std::numeric_limits<double>::max();
 
     int depIdx = 0;
-    for (int i = 0; i < (int)nodos.size(); ++i)
+    for (int i = 0; i < static_cast<int>(nodos.size()); ++i)
         if (nodos[i].esDeposito) { depIdx = i; break; }
 
     std::vector<int> clienteIdxs;
-    for (int i = 0; i < (int)nodos.size(); ++i)
+    for (int i = 0; i < static_cast<int>(nodos.size()); ++i)
         if (!nodos[i].esDeposito) clienteIdxs.push_back(i);
 
-    if (clienteIdxs.empty() || vehiculos.empty() || depIdx < 0) {
+    if (clienteIdxs.empty() || vehiculos.empty()) {
         mejor.distanciaTotal = 0.0;
         auto t1 = std::chrono::high_resolution_clock::now();
         mejor.tiempoMs = std::chrono::duration<double, std::milli>(t1 - t0).count();
         return mejor;
     }
 
-    const int POP = 80;
-    const int GENS = 300;
+    const int    POP    = 80;
+    const int    GENS   = 300;
     const double PCROSS = 0.85;
-    const double PMUT = 0.15;
+    const double PMUT   = 0.15;
 
     std::mt19937 rng(42);
     std::uniform_real_distribution<double> rReal(0.0, 1.0);
-    std::uniform_int_distribution<int> rIdx(0, (int)clienteIdxs.size() - 1);
+    std::uniform_int_distribution<int>     rIdx(0, static_cast<int>(clienteIdxs.size()) - 1);
 
     std::vector<Crom> pobla(POP, clienteIdxs);
     for (auto& cr : pobla) std::shuffle(cr.begin(), cr.end(), rng);
@@ -78,13 +88,13 @@ ResultadoAlgoritmo ejecutarGenetico(const std::vector<Nodo>& nodos, const std::v
         std::vector<std::pair<double, int>> fit;
         for (int i = 0; i < POP; ++i) {
             std::vector<std::vector<int>> tmp;
-            fit.push_back({ evaluar(pobla[i], nodos, vehiculos, depIdx, tmp), i });
+            fit.push_back({ evaluar(pobla[i], dist, nodos, vehiculos, depIdx, tmp), i });
         }
         std::sort(fit.begin(), fit.end());
 
         if (fit[0].first < mejor.distanciaTotal) {
             std::vector<std::vector<int>> mr;
-            mejor.distanciaTotal = evaluar(pobla[fit[0].second], nodos, vehiculos, depIdx, mr);
+            mejor.distanciaTotal = evaluar(pobla[fit[0].second], dist, nodos, vehiculos, depIdx, mr);
             mejor.rutas = mr;
         }
 
@@ -94,9 +104,9 @@ ResultadoAlgoritmo ejecutarGenetico(const std::vector<Nodo>& nodos, const std::v
 
         std::uniform_int_distribution<int> rElite(0, POP / 3);
 
-        while ((int)nueva.size() < POP) {
-            int p1 = fit[rElite(rng)].second;
-            int p2 = fit[rElite(rng)].second;
+        while (static_cast<int>(nueva.size()) < POP) {
+            int  p1   = fit[rElite(rng)].second;
+            int  p2   = fit[rElite(rng)].second;
             Crom hijo = pobla[p1];
 
             if (rReal(rng) < PCROSS) {
@@ -104,12 +114,12 @@ ResultadoAlgoritmo ejecutarGenetico(const std::vector<Nodo>& nodos, const std::v
                 if (a > b) std::swap(a, b);
                 std::vector<bool> enHijo(nodos.size(), false);
                 for (int k = a; k <= b; ++k) enHijo[hijo[k]] = true;
-                int pos = (b + 1) % (int)hijo.size();
-                for (int g : pobla[p2]) {
-                    if (!enHijo[g]) {
-                        hijo[pos] = g;
-                        enHijo[g] = true;
-                        pos = (pos + 1) % (int)hijo.size();
+                int pos = (b + 1) % static_cast<int>(hijo.size());
+                for (int gene : pobla[p2]) {
+                    if (!enHijo[gene]) {
+                        hijo[pos]    = gene;
+                        enHijo[gene] = true;
+                        pos = (pos + 1) % static_cast<int>(hijo.size());
                     }
                 }
             }
