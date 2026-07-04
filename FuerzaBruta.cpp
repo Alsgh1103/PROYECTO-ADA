@@ -1,25 +1,26 @@
 #include "Algoritmos.hpp"
-#include <cmath>
-#include <chrono>
 #include <algorithm>
+#include <chrono>
 #include <limits>
 
-static float distM(const Nodo& a, const Nodo& b) {
-    return std::abs(a.pos_x - b.pos_x) + std::abs(a.pos_y - b.pos_y);
-}
-
-ResultadoAlgoritmo ejecutarFuerzaBruta(const std::vector<Nodo>& nodos, const std::vector<Vehiculo>& vehiculos) {
+// Fuerza bruta: prueba todas las permutaciones de clientes.
+// Usa demandaTotal() para la validación de capacidad.
+ResultadoAlgoritmo ejecutarFuerzaBruta(
+    const MatrizDist& dist,
+    const std::vector<Nodo>& nodos,
+    const std::vector<Vehiculo>& vehiculos)
+{
     auto t0 = std::chrono::high_resolution_clock::now();
 
     ResultadoAlgoritmo mejor;
     mejor.distanciaTotal = std::numeric_limits<double>::max();
 
     int depIdx = 0;
-    for (int i = 0; i < (int)nodos.size(); ++i)
+    for (int i = 0; i < static_cast<int>(nodos.size()); ++i)
         if (nodos[i].esDeposito) { depIdx = i; break; }
 
     std::vector<int> clienteIdxs;
-    for (int i = 0; i < (int)nodos.size(); ++i)
+    for (int i = 0; i < static_cast<int>(nodos.size()); ++i)
         if (!nodos[i].esDeposito) clienteIdxs.push_back(i);
 
     if (clienteIdxs.empty() || vehiculos.empty()) {
@@ -42,23 +43,25 @@ ResultadoAlgoritmo ejecutarFuerzaBruta(const std::vector<Nodo>& nodos, const std
             float carga  = vehiculos[vi].capacidad;
             int   actual = depIdx;
 
-            while (ci < clienteIdxs.size() && nodos[clienteIdxs[ci]].demanda <= carga) {
+            while (ci < clienteIdxs.size() &&
+                   demandaTotal(nodos[clienteIdxs[ci]].productos) <= carga) {
                 int nIdx = clienteIdxs[ci];
-                distAct += distM(nodos[actual], nodos[nIdx]);
+                if (nodos[nIdx].vehiculoAsignado != -1 && nodos[nIdx].vehiculoAsignado != (int)vi) {
+                    break;
+                }
+                distAct += dist[actual][nIdx];
                 ruta.push_back(nIdx);
-                carga  -= nodos[nIdx].demanda;
-                actual  = nIdx;
+                carga   -= demandaTotal(nodos[nIdx].productos);
+                actual   = nIdx;
                 ++ci;
             }
 
-            distAct += distM(nodos[actual], nodos[depIdx]);
+            distAct += dist[actual][depIdx];
             ruta.push_back(depIdx);
             rutasAct.push_back(ruta);
         }
 
-        bool valido = (ci >= clienteIdxs.size());
-
-        if (valido && distAct < mejor.distanciaTotal) {
+        if (ci >= clienteIdxs.size() && distAct < mejor.distanciaTotal) {
             mejor.distanciaTotal = distAct;
             mejor.rutas = rutasAct;
         }
